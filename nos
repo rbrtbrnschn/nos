@@ -1,0 +1,147 @@
+#!/bin/bash
+LIST="node code spotify vim"
+DEPS="curl wget git xclip"
+SELECTED="${LIST}"
+
+function node(){
+    function add_to_bashrc() {
+	    text='export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" # This loads nvm'
+	    echo ${text} > ~/.bashrc
+    }
+    
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.36.0/install.sh | bash
+    local status_code=$?
+    local grep=$(cat ~/.bashrc | grep '$NVM_DIR/nvm.sh' )
+    [ "${grep}" == "" ] && add_to_bashrc
+    . ~/.bashrc
+    return ${status_code}
+}
+
+function code() {
+    wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > packages.microsoft.gpg
+    sudo install -o root -g root -m 644 packages.microsoft.gpg /etc/apt/trusted.gpg.d/
+    sudo sh -c 'echo "deb [arch=amd64 signed-by=/etc/apt/trusted.gpg.d/packages.microsoft.gpg] https://packages.microsoft.com/repos/vscode stable main" > /etc/apt/sources.list.d/vscode.list'
+    sudo apt-get install apt-transport-https
+    sudo apt-get update
+    sudo apt-get install code || sudo apt-get install code-insiders
+    local status_code=$?
+    [ -f "packages.microsoft.gpg" ] && rm packages.microsoft.gpg
+    return ${status_code}
+}
+
+function spotify() {
+    curl -sS https://download.spotify.com/debian/pubkey_0D811D58.gpg | sudo apt-key add - 
+    echo "deb http://repository.spotify.com stable non-free" | sudo tee /etc/apt/sources.list.d/spotify.list
+    sudo apt-get update
+    sudo apt-get install spotify-client -y
+    return $?
+}
+
+function vim() {
+    sudo apt-get install -y vim
+    local status_code=$?
+    local vimrc_url="https://raw.githubusercontent.com/amix/vimrc/master/vimrcs/basic.vim"
+    if [ -f "${HOME}/.vimrc" ]; then
+        echo "$(tput bold)It seams you already have a .vimrc"
+        yes_no "Wish to replace it with a better one?$(tput sgr0) [y/n]"
+        local boo=$?
+        [[ ${boo} -eq 0 ]] && rm ~/.vimrc && vim
+    else
+        curl -o- ${vimrc_url} > ~/.vimrc
+    fi
+    return ${status_code}
+}
+
+function yes_no() {
+	# YES return 0
+	# NO returns 1
+	local msg="$1"
+	echo -e ${msg}
+	read boo
+	case ${boo} in
+		[yY] | [yY][eE][sS])
+			return 0
+		;;
+		[nN] | [nN][oO])
+			return 1
+		;;
+	esac
+	echo
+}
+
+function list_items() {
+	local msg="Default Install? [y]\nInstalling: $(tput setaf 3)${LIST}$(tput sgr0)\nDependencies: $(tput setaf 3)${DEPS}$(tput sgr0)\n\nCustom Install? [n]\nIf you dont want to install each of the modules above.\nChoose '$(tput bold)custom$(tput sgr0)' and select only those modules you want.\nYour choice."
+	yes_no "${msg}"
+	[[ $? -eq 0 ]] && return 
+	echo -e "\nHit ENTER for modules you wish to install"	
+	SELECTED=""
+	local list="$@"
+	for item in ${list};do
+		read -p "  ${item}" boo
+		echo -ne "\e[1A\e[K" >&2
+		case ${boo} in
+			"")
+				echo -ne "+ ${item}"
+				echo
+				SELECTED+="${item} "
+			;;
+			*)
+				echo -ne "- ${item}"
+				echo
+			;;
+		esac
+	done
+	echo
+}
+
+function is_function() {
+    local=$1
+    grep=$(type $1 | grep function)
+    echo $grep
+    [ ! "${grep}" == "" ] && return 0 || return 1
+}
+function failed() {
+    local item=$1
+    FAILED+="${item} "
+    local msg="$(tput bold)$(tput setaf 1)FAILED ${item}$(tput sgr0)"
+}
+
+function succeeded() {
+    local item=$1
+    INSTALLED+="${item} "
+    local msg="$(tput bold)$(tput setaf 2)Installed ${item}$(tput sgr0)"
+}
+
+function install() {
+    local list="$@"
+    local msg_failed
+    local msg_installed
+    for item in ${list};do
+        (is_function ${item} && ${item}) \
+            && succeeded ${item} \
+            || failed ${item}
+    done
+}
+
+function install::deps() {
+    for module in ${deps}; do
+        sudo apt-get install -y ${module}
+    done
+}
+
+function echo::installed() {
+    echo "-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_"
+    echo -e "$(tput bold)$(tput setaf 2)Installed$(tput sgr0):\n${INSTALLED}"
+    [[ ${#FAILED[@]} -ne 0 ]] \
+    && echo -e "$(tput bold)$(tput setaf 1)Failed$(tput sgr0):\n${FAILED}"
+}
+
+
+# Init
+list_items ${LIST}
+install::deps
+install ${SELECTED}
+
+sudo apt autoremove
+echo::installed
