@@ -1,5 +1,5 @@
 #!/bin/bash
-LIST="node code spotify vim"
+LIST="node code spotify vim discord"
 DEPS="curl wget git xclip"
 SELECTED="${LIST}"
 
@@ -51,6 +51,14 @@ function vim() {
         curl -o- ${vimrc_url} > ~/.vimrc
     fi
     return ${status_code}
+}
+
+function discord() {
+    curl https://dl.discordapp.net/apps/linux/0.0.12/discord-0.0.12.deb -o discord.deb
+    sudo dpkg -i ./discord.deb
+    local status_code=$?
+    rm ./discord.deb
+    [[ ${status_code} -eq 0 ]] && return 0 || return 1
 }
 
 function yes_no() {
