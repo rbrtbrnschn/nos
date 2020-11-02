@@ -7,7 +7,7 @@ function node(){
     function add_to_bashrc() {
 	    text='export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" # This loads nvm'
-	    echo ${text} > ~/.bashrc
+	    echo ${text} >> ~/.bashrc
     }
     
     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.36.0/install.sh | bash
